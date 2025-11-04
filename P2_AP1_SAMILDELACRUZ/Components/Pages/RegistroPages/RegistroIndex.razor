@@ -1,15 +1,15 @@
 ﻿@page "/Registro"
-
+@inject ComponenteService componenteService
 @rendermode InteractiveServer
-@inject  RegistroServices registroServices
 @using System.Linq.Expressions;
+@inject IJSRuntime JS
 
 <PageTitle>Lista Registros</PageTitle>
 <div class="container">
     <div class="card shadow-lg">
         <div class="card-header space-between">
             <h5 class="card-title text-center">Registros</h5>
-            <a href="/Registro/Create" class="btn btn-primary"> <span class="bi bi-plus-square bi-trask mt-3"></span> Crear</a>
+            <a href="/Componente/Create" class="btn btn-primary"> <span class="bi bi-plus-square bi-trask mt-3"></span> Crear</a>
         </div>
 
         <div class="card-body">
@@ -48,6 +48,7 @@
                     <InputSelect class="form-select" @bind-Value="Filtro">
                         <option value="" selected disabled>Elija una opci&oacute;n</option>
                         <option value="ID">ID</option>
+                        <option value="Fecha">Fecha</option>
                         <option value="Nombre">Nombre</option>
                     </InputSelect>
                 </div>
@@ -65,28 +66,33 @@
                 <thead class="table text-black">
                     <tr>
 
-                        <th>ID</th>
+                        <th>PedidoId</th>
                         <th>Fecha</th>
-                        <th>Nombre</th>
+                        <th>NombreCliente</th>
+                        <th>Total</th>
                         <th colspan="2" class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var Registro in ListaRegistros)
+                    @foreach (var pedido in ListaPedidos)
                     {
                         <tr>
                             @*Detalle*@
-                            <td> @Registro.RegistroId</td>
-                            
+
+                            <td> @pedido.PedidoId</td>
+                            <td> @pedido.Fecha</td>
+                            <td> @pedido.NombreCliente</td>
+                            <td> @pedido.Total</td>
+                           
 
                             @*BTN Editar*@
                             <td class="text-center">
-                                <a href="/Registro/Edit/@Registro.RegistroId" class="btn btn-outline-primary bi bi-pencil-square"></a>
+                                <a href="/Registro/Edit/@pedido.PedidoId" class="btn btn-outline-primary bi bi-pencil-square"></a>
                             </td>
 
                             @*BTN Eliminar*@
                             <td class="text-center">
-                                <button class="btn btn-outline-danger bi bi-trash" @onclick="() => Eliminar(Registro.RegistroId)"></button>
+                                <button class="btn btn-outline-danger bi bi-trash" @onclick="() => Eliminar(pedido.PedidoId)"></button>
                             </td>
                         </tr>
                     }
@@ -94,11 +100,80 @@
             </table>
         </div>
         <div class="card-footer space-between">
-            <label>Registros:  @ListaRegistros.Count()</label>
+            <label>Registros:  @ListaPedidos.Count()</label>
         </div>
     </div>
 </div>
 
 
 @code {
+    public List<Pedidos> ListaPedidos { get; set; }
+    public string Filtro { get; set; } = string.Empty;
+    public string ValorFiltro { get; set; } = string.Empty;
+
+    public DateTime? Desde { get; set; }
+    public DateTime? Hasta { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ListaPedidos = await componenteService.ListarPedidos(p => p.PedidoId > 0);
+    }
+
+
+    public async Task Buscar()
+    {
+        var listaFiltrada = await componenteService.ListarPedidos(p => p.PedidoId > 0);
+
+        if (!string.IsNullOrEmpty(Filtro))
+        {
+            if (Filtro == "Id" && int.TryParse(ValorFiltro, out int id))
+            {
+                listaFiltrada = listaFiltrada.Where(p => p.PedidoId == id).ToList();
+            }
+            else if (Filtro == "Nombre")
+            {
+                listaFiltrada = listaFiltrada.Where(p => p.NombreCliente.Contains(ValorFiltro, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+            else if (Filtro == "Fecha")
+            {
+                if (Desde.HasValue)
+                {
+                    listaFiltrada = listaFiltrada.Where(p => p.Fecha >= Desde.Value.Date).ToList();
+                }
+                if (Hasta.HasValue)
+                {
+                    DateTime fechaHasta = Hasta.Value.Date.AddDays(1).AddSeconds(-1);
+                    listaFiltrada = listaFiltrada.Where(p => p.Fecha <= fechaHasta).ToList();
+                }
+            }
+        }
+
+        ListaPedidos = listaFiltrada;
+
+    }
+    public async Task ConfirmarEliminar(int id)
+    {
+        bool confirmado = await JS.InvokeAsync<bool>("confirm", "¿Estás seguro de que quieres eliminar este registro?");
+        if (confirmado)
+        {
+            await Eliminar(id);
+        }
+    }
+
+
+    public async Task Eliminar(int id)
+    {
+        await componenteService.Eliminar(id);
+        ListaPedidos = await componenteService.ListarPedidos(p => p.PedidoId > 0);
+    }
+
+    public async Task Restablecer()
+    {
+        ListaPedidos = await componenteService.ListarPedidos(P => P.PedidoId > 0);
+        Filtro = string.Empty;
+        ValorFiltro = string.Empty;
+        Desde = null;
+        Hasta = null;
+    }
+
 }

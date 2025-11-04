@@ -1,12 +1,11 @@
-﻿@page "/Registro/Create"
+﻿@page "/Componente/Create"
 @rendermode InteractiveServer
-@inject RegistroServices registroServices
-@inject TiposRegistrosService tiposregistrosService
+@inject ComponenteService componentesService
 @inject NavigationManager navigationManager
 @inject IJSRuntime JS
 
-<PageTitle>Crear huacales</PageTitle>
-<EditForm Model="Registro" OnValidSubmit="ConfirmarGuardar">
+<PageTitle>Crear pedido de componentes</PageTitle>
+<EditForm Model="pedido" OnValidSubmit="ConfirmarGuardar">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -22,31 +21,25 @@
 
                 <div class="mt-3">
                     <label class="form-label"><strong>ID</strong></label>
-                    <InputNumber class="form-control" @bind-Value="" readonly />
+                    <InputNumber class="form-control" @bind-Value="pedido.PedidoId" readonly />
                 </div>
 
                 <div class="mt-3">
                     <label class="form-label"><strong>Fecha</strong></label>
-                    <InputDate class="form-control" @bind-Value="" />
-                    <ValidationMessage For="@(() =>)" />
+                    <InputDate class="form-control" @bind-Value="pedido.Fecha" />
+                    <ValidationMessage For="@(() =>pedido.Fecha)" />
                 </div>
 
                 <div class="mt-3">
                     <label class="form-label"><strong>Nombre</strong></label>
-                    <InputText class="form-control" @bind-Value="" />
-                    <ValidationMessage For="@(() => )" />
+                    <InputText class="form-control" @bind-Value="pedido.NombreCliente" />
+                    <ValidationMessage For="@(() => pedido.NombreCliente)" />
                 </div>
 
                 <div class="mt-3">
-                    <label class="form-label"><strong>Cantidad</strong></label>
-                    <InputNumber class="form-control" @bind-Value="" />
-                    <ValidationMessage For="@(() => )" />
-                </div>
-
-                <div class="mt-3">
-                    <label class="form-label"><strong>Precio</strong></label>
-                    <InputNumber class="form-control" @bind-Value="huacales.Precio" />
-                    <ValidationMessage For="@(() => huacales.Precio)" />
+                    <label class="form-label"><strong>Total</strong></label>
+                    <InputNumber class="form-control" @bind-Value="pedido.Total" />
+                    <ValidationMessage For="@(() => pedido.Total)" />
                 </div>
 
                 @*Detalle*@
@@ -54,18 +47,18 @@
                     <h5>Detalles Entrada</h5>
                     <div class="row">
                         <div class="col-4">
-                            <label class="form-label">Tipo Registro</label>
-                            <InputSelect @bind-Value="TipoId" class="form-select">
+                            <label class="form-label">Componentes detalle</label>
+                            <InputSelect @bind-Value="componente" class="form-select">
                                 <option value="0">Seleccione un tipo</option>
                                 @foreach (var tipo in ListaTipos)
                                 {
-                                    <option value="@tipo.TipoId">@tipo.Descripcion</option>
+                                    <option value="@tipo.ComponenteId">@tipo.Descripcion</option>
                                 }
                             </InputSelect>
                         </div>
 
                         <div class="col-3">
-                            <label class="form-label">Cantiddad</label>
+                            <label class="form-label">Cantidad</label>
                             <InputNumber class="form-control" @bind-Value="CantidadDetalle"></InputNumber>
                         </div>
                         <div class="col-3">
@@ -77,24 +70,23 @@
                         </div>
                     </div>
 
-                    @if (huacales.EntradaHuacalDetalle.Any())
+                    @if (pedido.PedidosDetalle.Any())
                     {
                         <div class="mt-3">
                             <table class="table table-bordered table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Tipo Huacal</th>
-                                        <th>Cantidad</th>
+                                        <th>Descripcion</th>
                                         <th>Precio</th>
-                                        <th>Importe</th>
+                                        <th>Existencia</th>
                                         <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var detalle in huacales.EntradaHuacalDetalle)
+                                    @foreach (var detalle in componente.ComponentesDetalle)
                                     {
                                         <tr>
-                                            <td>@(ListaTipos.FirstOrDefault(t => t.TipoId == detalle.TipoId)?.Descripcion ?? "N/A")</td>
+                                            <td>@(ListaTipos.FirstOrDefault(t => t.ComponenteId == detalle.ComponenteId)?.Descripcion ?? "N/A")</td>
                                             <td>@detalle.Cantidad</td>
                                             <td>@detalle.Precio.ToString("C")</td>
                                             <td>@((detalle.Cantidad * detalle.Precio).ToString("C"))</td>
@@ -106,7 +98,7 @@
                                     }
                                 </tbody>
                             </table>
-                            <label class="float-end"><strong>Cantidad de Detalles: </strong>@huacales.EntradaHuacalDetalle.Count</label>
+                            <label class="float-end"><strong>Cantidad de Detalles: </strong>@pedido.PedidosDetalle.Count</label>
                         </div>
                     }
                 </div>
@@ -117,7 +109,7 @@
         </div>
 
         <div class="card-footer text-center mt-3">
-            <a href="/Huacales" class="btn btn-secondary">
+            <a href="/Registro" class="btn btn-secondary">
                 <span class="bi bi-arrow-left">Volver</span>
             </a>
             <button type="submit" class="btn btn-primary bi bi-floppy">Guardar</button>
@@ -128,5 +120,83 @@
 </EditForm>
 
 @code {
-    
+    public Componente componente = new();
+    public Pedidos pedido = new();
+    public string Mensaje { get; set; } = string.Empty;
+    public List<Componente> ListaTipos { get; set; } = [];
+    public int PedidoId { get; set; }
+    public int CantidadDetalle { get; set; }
+    public double PrecioDetalle { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        pedido.Fecha = DateTime.Now;
+        ListaTipos = await componentesService.Listar(P => true);
+    }
+
+    public void AgregarDetalle()
+    {
+        if (PedidoId == 0)
+        {
+            Mensaje = "Debe seleccionar un tipo de componente";
+            return;
+        }
+        if (CantidadDetalle <= 0 || PrecioDetalle <= 0)
+        {
+            Mensaje = "Cantidad y Precio deben ser mayores a cero.";
+            return;
+        }
+
+        Mensaje = string.Empty;
+
+        var nuevoDetalle = new PedidosDetalle
+        {
+            PedidoId = PedidoId,
+            Cantidad = CantidadDetalle,
+            Precio = PrecioDetalle,
+        };
+        pedido.PedidosDetalle.Add(nuevoDetalle);
+
+        RecalcularTotales();
+
+        PedidoId = 0;
+        CantidadDetalle = 0;
+        PrecioDetalle = 0;
+    }
+
+    public void EliminarDetalle(PedidosDetalle detalle)
+    {
+        pedido.PedidosDetalle.Remove(detalle);
+        RecalcularTotales();
+    }
+
+    private void RecalcularTotales()
+    {
+        pedido.Total = pedido.PedidosDetalle.Sum(p => p.Precio);
+        double importeTotal = pedido.PedidosDetalle.Sum(p => p.Cantidad * p.Precio);
+    }
+
+    public async Task ConfirmarGuardar()
+    {
+        bool confirmar = await JS.InvokeAsync<bool>("confirm", "¿Deseas guardar este registro?");
+        if (confirmar)
+        {
+            await Guardar(pedido);
+        }
+    }
+
+
+    public async Task Guardar(Pedidos pedido)
+    {
+        if (!pedido.PedidosDetalle.Any())
+        {
+            await JS.InvokeVoidAsync("alert", "⚠️ Debe agregar al menos un detalle.");
+            return;
+        }
+
+        await componentesService.Guardar(pedido);
+        await JS.InvokeVoidAsync("alert", "✅ Registro guardado exitosamente.");
+        navigationManager.NavigateTo("/Registro");
+    }
 }

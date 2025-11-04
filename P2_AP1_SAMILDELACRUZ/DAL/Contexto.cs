@@ -9,6 +9,8 @@ public class Contexto : DbContext
     // public DbSet<Registro> Registro { get; set; }
 
     public DbSet<Componente> Componentes { get; set; }
+    public DbSet<Pedidos> Pedidos { get; set; }
+    public DbSet<PedidosDetalle> pedidosDetalles { get; set; }
 
 
 
